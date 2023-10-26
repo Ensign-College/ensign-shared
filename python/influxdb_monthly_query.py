@@ -12,6 +12,7 @@ BUCKET_NAME = os.environ.get('INFLUXDB_BUCKET_NAME')
 ORGANIZATION = os.environ.get('INFLUXDB_ORGANIZATION')
 TOKEN = os.environ.get('INFLUXDB_TOKEN')
 BASE_URL=os.environ.get('INFLUXDB_URL')
+BASE_URL=os.environ.get('PARQUET_FILES_DIRECTORY')
 
 
 client = influxdb_client.InfluxDBClient(
@@ -56,14 +57,15 @@ parquet_file = f'{current_year_month}_servers.parquet'
 
 # Write the Arrow Table to a Parquet file
 print('Creating/Appending parquet file!')
-if os.path.exists(parquet_file):
-    existing_table = pq.read_table(parquet_file)
+full_path = f'{BASE_URL}/{parquet_file}'
+if os.path.exists(full_path):
+    existing_table = pq.read_table(full_path)
     combined_table = pa.concat_tables([existing_table, new_table])
 else:
     combined_table = new_table
-    # pq.write_table(new_table, parquet_file)
+    # pq.write_table(new_table, full_path)
 
-with pq.ParquetWriter(parquet_file, combined_table.schema) as writer:
+with pq.ParquetWriter(full_path, combined_table.schema) as writer:
     writer.write_table(combined_table)
 
 print('Process finished!')
