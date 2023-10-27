@@ -1,5 +1,6 @@
 import influxdb_client
 import os
+import syslog
 
 import pandas as pd
 import pyarrow as pa
@@ -40,18 +41,27 @@ from(bucket: "server")
     |> yield(name: "mean")
 '''
 
-print(f'Getting data from InfluxDB for date: {yesterday.strftime("%Y-%m-%d")}!')
-start_process = datetime.now()
-print('start: ', start_process)
+log_message = f'Getting data from InfluxDB for date: {yesterday.strftime("%Y-%m-%d")}!'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+
+start_process = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+log_message = f'start: {start_process}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
 
 result = query_api.query(org=ORGANIZATION, query=servers_main_query)
 
 # Assuming you want to convert the result to a Pandas DataFrame
-end_process = datetime.now()
-print('end: ', end_process)
+end_process = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+log_message = f'end: {end_process}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
 
 process_time = end_process - start_process
-print(f'The query took: {process_time}')
+log_message = f'The query took: {process_time}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
 
 data = []
 for index, table in enumerate(result):
@@ -61,7 +71,10 @@ for index, table in enumerate(result):
         data.append(record.values)
 
 # Create a Pandas DataFrame
-print('Creating data frame')
+log_message = 'Creating data frame'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+
 df = pd.DataFrame(data, columns=columns)
 
 # Convert the Pandas DataFrame to an Arrow Table
@@ -72,7 +85,10 @@ current_year_month = yesterday.strftime('%Y%m')
 parquet_file = f'{current_year_month}_servers.parquet'
 
 # Write the Arrow Table to a Parquet file
-print('Creating/Appending parquet file!')
+log_message = 'Creating/Appending parquet file!'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+
 full_path = f'{PARQUET_FILES_DIRECTORY}/{parquet_file}'
 if os.path.exists(full_path):
     existing_table = pq.read_table(full_path)
@@ -84,4 +100,6 @@ else:
 with pq.ParquetWriter(full_path, combined_table.schema) as writer:
     writer.write_table(combined_table)
 
-print('Process finished!')
+log_message = 'Process finished!'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
