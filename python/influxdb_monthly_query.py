@@ -1,11 +1,13 @@
 import influxdb_client
 import os
 import syslog
+import sys
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from datetime import datetime, timedelta
+from constants import build_query_string
 from dotenv import load_dotenv
 
 load_dotenv()  # take environment variables from .env.
@@ -17,6 +19,19 @@ BASE_URL=os.environ.get('INFLUXDB_URL')
 PARQUET_FILES_DIRECTORY=os.environ.get('PARQUET_FILES_DIRECTORY')
 START_DATETIME=os.environ.get('START_DATETIME')
 END_DATETIME=os.environ.get('END_DATETIME')
+MEASUREMENTS = [
+    'cpu', 'disk', 'diskio', 'kernel', 'mem', 'net', 'netstat', 'processes',
+    'swap', 'system'
+]
+COLUMNS = [
+    'table', 'result', 'measurement', 'field', 'value', 'start', 'stop',
+    'time', 'host', 'cpu', 'device', 'fstype', 'node', 'path', 'interface'
+]
+
+measurement = sys.argv[1]
+if measurement not in MEASUREMENTS:
+    print(f'Exiting program. "{measurement}" is not a valid measurement')
+    sys.exit()
 
 today = datetime.now()
 yesterday = today - timedelta(days=1)
@@ -24,7 +39,7 @@ yesterday = today - timedelta(days=1)
 if not START_DATETIME or not END_DATETIME:
     START_DATETIME = f'{yesterday.strftime("%Y-%m-%dT")}00:00:00Z'
     END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
-
+    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
 
 client = influxdb_client.InfluxDBClient(
     url=BASE_URL,
@@ -34,27 +49,33 @@ client = influxdb_client.InfluxDBClient(
 
 # Query script
 query_api = client.query_api()
-servers_main_query = f'''
-from(bucket: "server")
-    |> range(start: {START_DATETIME}, stop: {END_DATETIME})
-    |> filter(fn: (r) => r["_measurement"] == "cpu" or r["_measurement"] == "disk" or r["_measurement"] == "diskio" or r["_measurement"] == "kernel" or r["_measurement"] == "mem" or r["_measurement"] == "net" or r["_measurement"] == "netstat" or r["_measurement"] == "processes" or r["_measurement"] == "swap" or r["_measurement"] == "system")
-    |> yield(name: "mean")
-'''
+query_string = build_query_string(
+    start=START_DATETIME, stop=END_DATETIME, measurement=measurement
+)
+
+log_message = 'The flux query to run:'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+log_message = query_string
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
 
 log_message = f'Getting data from InfluxDB for date: {yesterday.strftime("%Y-%m-%d")}!'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
-start_process = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-log_message = f'start: {start_process}'
+start_process = datetime.now()
+log_message = f'Start: {start_process.strftime("%Y-%m-%d %H:%M:%S")}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
-result = query_api.query(org=ORGANIZATION, query=servers_main_query)
+result = query_api.query(
+    org=ORGANIZATION, query=query_string
+)
 
 # Assuming you want to convert the result to a Pandas DataFrame
-end_process = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-log_message = f'end: {end_process}'
+end_process = datetime.now()
+log_message = f'End: {end_process.strftime("%Y-%m-%d %H:%M:%S")}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
@@ -64,18 +85,33 @@ syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
 data = []
-for index, table in enumerate(result):
-    if index == 0:
-        columns = table.columns
+for table in result:
     for record in table.records:
-        data.append(record.values)
+        data.append([
+            record.values.get('table'),
+            record.values.get('result'),
+            record.values.get('_measurement'),
+            record.values.get('_field'),
+            record.values.get('_value'),
+            record.values.get('_start'),
+            record.values.get('_stop'),
+            record.values.get('_time'),
+            record.values.get('host', ''),
+            record.values.get('cpu', ''),
+            record.values.get('device', ''),
+            record.values.get('fstype', ''),
+            record.values.get('fstype', ''),
+            record.values.get('path', ''),
+            record.values.get('interface', ''),
+        ])
+
 
 # Create a Pandas DataFrame
 log_message = 'Creating data frame'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
-df = pd.DataFrame(data, columns=columns)
+df = pd.DataFrame(data, columns=COLUMNS)
 
 # Convert the Pandas DataFrame to an Arrow Table
 new_table = pa.Table.from_pandas(df)
@@ -95,7 +131,6 @@ if os.path.exists(full_path):
     combined_table = pa.concat_tables([existing_table, new_table])
 else:
     combined_table = new_table
-    # pq.write_table(new_table, full_path)
 
 with pq.ParquetWriter(full_path, combined_table.schema) as writer:
     writer.write_table(combined_table)
