@@ -31,8 +31,8 @@ yesterday = today - timedelta(days=1)
 
 if not START_DATETIME or not END_DATETIME:
     START_DATETIME = f'{yesterday.strftime("%Y-%m-%dT")}00:00:00Z'
-    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
-    END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
+    END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
+    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
 
 client = influxdb_client.InfluxDBClient(
     url=BASE_URL,
