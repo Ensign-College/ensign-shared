@@ -7,7 +7,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from datetime import datetime, timedelta
-from constants import build_query_string
+from constants import build_query_string, COLUMN_TYPES, COLUMNS, MEASUREMENTS
 from dotenv import load_dotenv
 
 load_dotenv()  # take environment variables from .env.
@@ -19,14 +19,7 @@ BASE_URL=os.environ.get('INFLUXDB_URL')
 PARQUET_FILES_DIRECTORY=os.environ.get('PARQUET_FILES_DIRECTORY')
 START_DATETIME=os.environ.get('START_DATETIME')
 END_DATETIME=os.environ.get('END_DATETIME')
-MEASUREMENTS = [
-    'cpu', 'disk', 'diskio', 'kernel', 'mem', 'net', 'netstat', 'processes',
-    'swap', 'system'
-]
-COLUMNS = [
-    'table', 'result', 'measurement', 'field', 'value', 'start', 'stop',
-    'time', 'host', 'cpu', 'device', 'fstype', 'node', 'path', 'interface'
-]
+
 
 measurement = sys.argv[1]
 if measurement not in MEASUREMENTS:
@@ -38,8 +31,8 @@ yesterday = today - timedelta(days=1)
 
 if not START_DATETIME or not END_DATETIME:
     START_DATETIME = f'{yesterday.strftime("%Y-%m-%dT")}00:00:00Z'
-    END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
-    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
+    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
+    END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
 
 client = influxdb_client.InfluxDBClient(
     url=BASE_URL,
@@ -87,23 +80,24 @@ print(log_message)
 data = []
 for table in result:
     for record in table.records:
-        data.append([
-            record.values.get('table'),
-            record.values.get('result'),
-            record.values.get('_measurement'),
-            record.values.get('_field'),
-            record.values.get('_value'),
-            record.values.get('_start'),
-            record.values.get('_stop'),
-            record.values.get('_time'),
-            record.values.get('host', ''),
-            record.values.get('cpu', ''),
-            record.values.get('device', ''),
-            record.values.get('fstype', ''),
-            record.values.get('fstype', ''),
-            record.values.get('path', ''),
-            record.values.get('interface', ''),
-        ])
+        if not record.values.get('error'):
+            data.append([
+                record.values.get('table'),
+                record.values.get('result'),
+                record.values.get('_measurement'),
+                record.values.get('_field'),
+                str(record.values.get('_value')),
+                record.values.get('_start'),
+                record.values.get('_stop'),
+                record.values.get('_time'),
+                record.values.get('host', ''),
+                record.values.get('cpu', ''),
+                record.values.get('device', ''),
+                record.values.get('fstype', ''),
+                record.values.get('node', ''),
+                record.values.get('path', ''),
+                record.values.get('interface', ''),
+            ])
 
 
 # Create a Pandas DataFrame
@@ -111,6 +105,7 @@ log_message = 'Creating data frame'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
+# df = pd.DataFrame(data, columns=COLUMNS, dtype=COLUMN_TYPES)
 df = pd.DataFrame(data, columns=COLUMNS)
 
 # Convert the Pandas DataFrame to an Arrow Table
