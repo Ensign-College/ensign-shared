@@ -34,7 +34,7 @@ FIRST_QUERY = '''
         |> range(start: %(start)s, stop: %(stop)s)
         |> filter(fn: (r) => r["_measurement"] == "%(measurement)s")'''
 FINAL_QUERY = '''
-        |> aggregateWindow(every: 10s, fn: last, createEmpty: false)
+        |> aggregateWindow(every: 10s, fn: mean, createEmpty: false)
 '''
 
 def build_query_string(
