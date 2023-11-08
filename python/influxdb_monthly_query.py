@@ -7,7 +7,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from datetime import datetime, timedelta
-from constants import build_query_string, COLUMN_TYPES, COLUMNS, MEASUREMENTS
+from constants import COLUMNS, MEASUREMENTS
+from utils import build_query_string
 from dotenv import load_dotenv
 
 load_dotenv()  # take environment variables from .env.
@@ -26,6 +27,11 @@ if measurement not in MEASUREMENTS:
     print(f'Exiting program. "{measurement}" is not a valid measurement')
     sys.exit()
 
+try:
+    specific_filter = sys.argv[2]
+except IndexError:
+    specific_filter = 'default'
+
 today = datetime.now()
 yesterday = today - timedelta(days=1)
 
@@ -42,18 +48,34 @@ client = influxdb_client.InfluxDBClient(
 
 # Query script
 query_api = client.query_api()
-query_string = build_query_string(
-    start=START_DATETIME, stop=END_DATETIME, measurement=measurement
+query_string, used_parameters = build_query_string(
+    start=START_DATETIME, stop=END_DATETIME, measurement=measurement,
+    specific_filter=specific_filter
 )
 
-log_message = 'The flux query to run:'
+log_message = 'Getting data with the following parameters:'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = query_string
+log_message = f'Bucket: {used_parameters["bucket"]}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
+log_message = f'Measurement: {used_parameters["measurement"]}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+log_message = f'From: {used_parameters["start"]} - To: {used_parameters["stop"]}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+log_message = f'Interval: every {used_parameters["every"]}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+log_message = f'Aggregating function: {used_parameters["fn"]}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
+# log_message = query_string
+# syslog.syslog(syslog.LOG_INFO, log_message)
+# print(log_message)
 
-log_message = f'Getting data from InfluxDB for date: {yesterday.strftime("%Y-%m-%d")}!'
+log_message = f'Querying data from InfluxDB for date: {yesterday.strftime("%Y-%m-%d")}!'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
