@@ -43,7 +43,7 @@ FILTERS = {
         'default': '''|> filter(fn: (r) => r["_field"] == "free" or r["_field"] == "in" or r["_field"] == "out" or r["_field"] == "total" or r["_field"] == "used" or r["_field"] == "used_percent")''',
     },
     'system': {
-        'default': '''|> filter(fn: (r) => r["_field"] == "load1" or r["_field"] == "load15" or r["_field"] == "load5" or r["_field"] == "n_cpus" or r["_field"] == "n_unique_users" or r["_field"] == "n_users" or r["_field"] == "uptime" or r["_field"] == "uptime_format")''',
+        'default': '''|> filter(fn: (r) => r["_field"] == "load1" or r["_field"] == "load15" or r["_field"] == "load5" or r["_field"] == "n_cpus" or r["_field"] == "n_unique_users" or r["_field"] == "n_users" or r["_field"] == "uptime")''',
     }
 }
 FIRST_QUERY = '''
