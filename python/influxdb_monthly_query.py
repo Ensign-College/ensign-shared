@@ -1,74 +1,88 @@
-import influxdb_client
-import os
+import argparse
 import syslog
-import sys
-
-import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
 from datetime import datetime, timedelta
-from constants import COLUMNS, MEASUREMENTS
-from utils import build_query_string
+
+from constants import FILTERS, MEASUREMENTS
 from dotenv import load_dotenv
+from utils import (build_aggregated_query_string, build_csv_file,
+                   build_parquet_file, build_specific_query_string,
+                   parse_end_date, parse_start_date)
 
 load_dotenv()  # take environment variables from .env.
 
-BUCKET_NAME = os.environ.get('INFLUXDB_BUCKET_NAME')
-ORGANIZATION = os.environ.get('INFLUXDB_ORGANIZATION')
-TOKEN = os.environ.get('INFLUXDB_TOKEN')
-BASE_URL=os.environ.get('INFLUXDB_URL')
-PARQUET_FILES_DIRECTORY=os.environ.get('PARQUET_FILES_DIRECTORY')
-START_DATETIME=os.environ.get('START_DATETIME')
-END_DATETIME=os.environ.get('END_DATETIME')
-
-
-measurement = sys.argv[1]
-if measurement not in MEASUREMENTS:
-    print(f'Exiting program. "{measurement}" is not a valid measurement')
-    sys.exit()
-
-try:
-    specific_filter = sys.argv[2]
-except IndexError:
-    specific_filter = 'default'
+# Create the parser
+parser = argparse.ArgumentParser()
 
 today = datetime.now()
 yesterday = today - timedelta(days=1)
 
-if not START_DATETIME or not END_DATETIME:
-    START_DATETIME = f'{yesterday.strftime("%Y-%m-%dT")}00:00:00Z'
-    END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}23:59:00Z'
-    # END_DATETIME= f'{yesterday.strftime("%Y-%m-%dT")}00:10:00Z'
-
-client = influxdb_client.InfluxDBClient(
-    url=BASE_URL,
-    token=TOKEN,
-    org=ORGANIZATION
+# Add an argument
+parser.add_argument(
+    '-t', '--type', type=str, required=True, choices=['normal', 'aggregated']
 )
+parser.add_argument(
+    '-s', '--start', type=parse_start_date,
+    default=yesterday.strftime("%Y-%m-%dT")
+)
+parser.add_argument(
+    '-e', '--end', type=parse_end_date,
+    default=yesterday.strftime("%Y-%m-%dT")
+)
+parser.add_argument(
+    '-m', '--measurement', type=str, choices=MEASUREMENTS
+)
+parser.add_argument('-b', '--bucket', type=str, default='server')
+parser.add_argument('-ev', '--every', type=str, default='1h')
+parser.add_argument('-fn', '--function', type=str, default='mean')
+parser.add_argument('-sf', '--specific-filter', type=str, default='default')
+parser.add_argument(
+    '-o', '--output', type=str, required=True, default='parquet',
+    choices=['parquet', 'csv']
+)
+# Parse the argument
+args = parser.parse_args()
+
+if args.type == 'normal' and not args.measurement:
+    raise argparse.ArgumentTypeError(
+        'With the normal query execution it is necessary to set a '
+        'measurement filter'
+    )
+
+if args.measurement and not FILTERS[args.measurement].get(args.specific_filter):
+    raise argparse.ArgumentTypeError(
+        f'The specific filter doesn\'t not exist for measurement '
+        f'{args.measurment}'
+    )
 
 # Query script
-query_api = client.query_api()
-query_string, used_parameters = build_query_string(
-    start=START_DATETIME, stop=END_DATETIME, measurement=measurement,
-    specific_filter=specific_filter
-)
+if args.type == 'normal':
+    query_string = build_specific_query_string(
+        start=args.start, stop=args.end, measurement=args.measurement,
+        specific_filter=args.specific_filter, bucket=args.bucket,
+        every=args.every, fn=args.function
+    )
+else:
+    query_string = build_aggregated_query_string(
+        start=args.start, stop=args.end, bucket=args.bucket,
+        every=args.every, fn=args.function
+    )
 
 log_message = 'Getting data with the following parameters:'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = f'Bucket: {used_parameters["bucket"]}'
+log_message = f'Bucket: {args.bucket}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = f'Measurement: {used_parameters["measurement"]}'
+log_message = f'Measurement: {args.measurement}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = f'From: {used_parameters["start"]} - To: {used_parameters["stop"]}'
+log_message = f'From: {args.start} - To: {args.end}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = f'Interval: every {used_parameters["every"]}'
+log_message = f'Interval: every {args.every}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
-log_message = f'Aggregating function: {used_parameters["fn"]}'
+log_message = f'Aggregating function: {args.function}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 # log_message = query_string
@@ -79,78 +93,11 @@ log_message = f'Querying data from InfluxDB for date: {yesterday.strftime("%Y-%m
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
 
-start_process = datetime.now()
-log_message = f'Start: {start_process.strftime("%Y-%m-%d %H:%M:%S")}'
-syslog.syslog(syslog.LOG_INFO, log_message)
-print(log_message)
-
-result = query_api.query(
-    org=ORGANIZATION, query=query_string
-)
-
-# Assuming you want to convert the result to a Pandas DataFrame
-end_process = datetime.now()
-log_message = f'End: {end_process.strftime("%Y-%m-%d %H:%M:%S")}'
-syslog.syslog(syslog.LOG_INFO, log_message)
-print(log_message)
-
-process_time = end_process - start_process
-log_message = f'The query took: {process_time}'
-syslog.syslog(syslog.LOG_INFO, log_message)
-print(log_message)
-
-data = []
-for table in result:
-    for record in table.records:
-        if not record.values.get('error'):
-            data.append([
-                record.values.get('table'),
-                record.values.get('result'),
-                record.values.get('_measurement'),
-                record.values.get('_field'),
-                str(record.values.get('_value')),
-                record.values.get('_start'),
-                record.values.get('_stop'),
-                record.values.get('_time'),
-                record.values.get('host', ''),
-                record.values.get('cpu', ''),
-                record.values.get('device', ''),
-                record.values.get('fstype', ''),
-                record.values.get('node', ''),
-                record.values.get('path', ''),
-                record.values.get('interface', ''),
-            ])
-
-
-# Create a Pandas DataFrame
-log_message = 'Creating data frame'
-syslog.syslog(syslog.LOG_INFO, log_message)
-print(log_message)
-
-# df = pd.DataFrame(data, columns=COLUMNS, dtype=COLUMN_TYPES)
-df = pd.DataFrame(data, columns=COLUMNS)
-
-# Convert the Pandas DataFrame to an Arrow Table
-new_table = pa.Table.from_pandas(df)
-
-# Specify the file path
-current_year_month = yesterday.strftime('%Y%m')
-parquet_file = f'{current_year_month}_servers.parquet'
-
-# Write the Arrow Table to a Parquet file
-log_message = 'Creating/Appending parquet file!'
-syslog.syslog(syslog.LOG_INFO, log_message)
-print(log_message)
-
-full_path = f'{PARQUET_FILES_DIRECTORY}/{parquet_file}'
-if os.path.exists(full_path):
-    existing_table = pq.read_table(full_path)
-    combined_table = pa.concat_tables([existing_table, new_table])
+# call function
+if args.output == 'parquet':
+    build_parquet_file(query_string)
 else:
-    combined_table = new_table
-
-with pq.ParquetWriter(full_path, combined_table.schema) as writer:
-    writer.write_table(combined_table)
+    build_csv_file(query_string)
 
 log_message = 'Process finished!'
 syslog.syslog(syslog.LOG_INFO, log_message)

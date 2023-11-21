@@ -4,7 +4,7 @@ Constants
 
 COLUMNS = [
     'table', 'result', 'measurement', 'field', 'value', 'start', 'stop',
-    'time', 'host', 'cpu', 'device', 'fstype', 'node', 'path', 'interface'
+    'time', 'host', 'cpu', 'device', 'fstype', 'mode', 'path', 'interface'
 ]
 MEASUREMENTS = [
     'cpu', 'disk', 'diskio', 'kernel', 'mem', 'net', 'netstat', 'processes',
@@ -54,3 +54,62 @@ FIRST_QUERY = '''
 FINAL_QUERY = '''
         |> aggregateWindow(every: %(every)s, fn: %(fn)s, createEmpty: false)
 '''
+AGGREGATED_QUERY = '''
+    from(bucket: "%(bucket)s")
+        |> range(start: %(start)s, stop: %(stop)s)
+        |> filter(fn: (r) => r["_measurement"] == "cpu" or r["_measurement"] == "disk" or r["_measurement"] == "diskio" or r["_measurement"] == "kernel" or r["_measurement"] == "mem" or r["_measurement"] == "net" or r["_measurement"] == "netstat" or r["_measurement"] == "processes" or r["_measurement"] == "swap" or r["_measurement"] == "system")
+        |> filter(fn: (r) => r["_field"] != "uptime_format")
+        |> aggregateWindow(every: %(every)s, fn: %(fn)s, createEmpty: false)
+'''
+CSV_TITLES = [
+    'influxdb', 'result', 'table', 'start', 'stop', 'time', 'value', 'field',
+    'measurement', 'host', 'cpu', 'device', 'fstype', 'mode', 'path',
+    'interface', 'label', 'name'
+]
+CSV_TITLES_LENGTH = len(CSV_TITLES)
+INITIAL = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement']
+LINE1 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'host']
+LINE2 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'cpu', 'host']
+LINE3 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'device', 'fstype', 'host', 'mode', 'path']
+LINE4 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'device', 'fstype', 'host', 'label', 'mode', 'path']
+LINE5 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'host', 'name']
+LINE6 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'host', 'interface']
+
+'''
+    0 'influxdb',
+    1 'result',
+    2 'table',
+    3 'start',
+    4 'stop',
+    5 'time',
+    6 'value',
+    7 'field',
+    8 'measurement',
+    ////////
+    9 'host',
+    10 'cpu',
+    11 'device',
+    12 'fstype',
+    13' mode',
+    14 'path',
+    15 'interface',
+    16 'label'
+    17 'name
+
+1 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'host']
+2 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'cpu', 'host']
+3 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 9'device', 10'fstype', 11'host', 12'mode', 13'path']
+4 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 9'device', 10'fstype', 11'host', 12'label', 13'mode', 14'path']
+5 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 9'host', 10'name']
+6 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 9'host', 10'interface']
+7 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'device', 'fstype', 'host', 'mode', 'path']
+'''
+
+BUILD_ROWS = {
+    1: lambda x: ['influxdb', *x[1:], *[''] * 8],
+    2: lambda x: ['influxdb', *x[1:9], x[10], x[9], *[''] * 7],
+    3: lambda x: ['influxdb', *x[1:9], x[11], '', x[9], x[10], x[12], x[13], *[''] * 3],
+    4: lambda x: ['influxdb', *x[1:9], x[11], '', x[9], x[10], x[13], x[14], '', x[12], ''],
+    5: lambda x: ['influxdb', *x[1:10], *[''] * 6, x[10]],
+    6: lambda x: ['influxdb', *x[1:10], *[''] * 4, x[10], *[''] * 2],
+}
