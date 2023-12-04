@@ -2,6 +2,8 @@
 Constants
 """
 
+from datetime import datetime
+
 COLUMNS = [
     'table', 'result', 'measurement', 'field', 'value', 'start', 'stop',
     'time', 'host', 'cpu', 'device', 'fstype', 'mode', 'path', 'interface'
@@ -61,6 +63,8 @@ AGGREGATED_QUERY = '''
         |> filter(fn: (r) => r["_field"] != "uptime_format")
         |> aggregateWindow(every: %(every)s, fn: %(fn)s, createEmpty: false)
 '''
+INCOMING_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+OUTPUT_FORMAT = '%b %d %H:%M:%S'
 CSV_TITLES = [
     'influxdb', 'result', 'table', 'start', 'stop', 'time', 'value', 'field',
     'measurement', 'host', 'cpu', 'device', 'fstype', 'mode', 'path',
@@ -105,11 +109,18 @@ LINE6 = ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', 
 7 - ['', 'result', 'table', '_start', '_stop', '_time', '_value', '_field', '_measurement', 'device', 'fstype', 'host', 'mode', 'path']
 '''
 
+
+def build_initial_column_for_wazuh(string_date, host):
+    parsed_date = datetime.strptime(string_date, INCOMING_FORMAT)
+    parsed_date = parsed_date.strftime(OUTPUT_FORMAT)
+
+    return f'{parsed_date} {host} influxdb:'
+
 BUILD_ROWS = {
-    1: lambda x: ['influxdb', *x[1:], *[''] * 8],
-    2: lambda x: ['influxdb', *x[1:9], x[10], x[9], *[''] * 7],
-    3: lambda x: ['influxdb', *x[1:9], x[11], '', x[9], x[10], x[12], x[13], *[''] * 3],
-    4: lambda x: ['influxdb', *x[1:9], x[11], '', x[9], x[10], x[13], x[14], '', x[12], ''],
-    5: lambda x: ['influxdb', *x[1:10], *[''] * 6, x[10]],
-    6: lambda x: ['influxdb', *x[1:10], *[''] * 4, x[10], *[''] * 2],
+    1: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:], *[''] * 8],
+    2: lambda x: [build_initial_column_for_wazuh(x[5], x[10]), *x[1:9], x[10], x[9], *[''] * 7],
+    3: lambda x: [build_initial_column_for_wazuh(x[5], x[11]), *x[1:9], x[11], '', x[9], x[10], x[12], x[13], *[''] * 3],
+    4: lambda x: [build_initial_column_for_wazuh(x[5], x[11]), *x[1:9], x[11], '', x[9], x[10], x[13], x[14], '', x[12], ''],
+    5: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 6, x[10]],
+    6: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 4, x[10], *[''] * 2],
 }

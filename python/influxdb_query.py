@@ -85,6 +85,9 @@ print(log_message)
 log_message = f'Aggregating function: {args.function}'
 syslog.syslog(syslog.LOG_INFO, log_message)
 print(log_message)
+log_message = f'Output type: {args.output}'
+syslog.syslog(syslog.LOG_INFO, log_message)
+print(log_message)
 # log_message = query_string
 # syslog.syslog(syslog.LOG_INFO, log_message)
 # print(log_message)
