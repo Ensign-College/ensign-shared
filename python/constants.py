@@ -121,6 +121,6 @@ BUILD_ROWS = {
     2: lambda x: [build_initial_column_for_wazuh(x[5], x[10]), *x[1:9], x[10], x[9], *[''] * 7],
     3: lambda x: [build_initial_column_for_wazuh(x[5], x[11]), *x[1:9], x[11], '', x[9], x[10], x[12], x[13], *[''] * 3],
     4: lambda x: [build_initial_column_for_wazuh(x[5], x[11]), *x[1:9], x[11], '', x[9], x[10], x[13], x[14], '', x[12], ''],
-    5: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 6, x[10]],
-    6: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 4, x[10], *[''] * 2],
+    5: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 7, x[10]],
+    6: lambda x: [build_initial_column_for_wazuh(x[5], x[9]), *x[1:10], *[''] * 5, x[10], *[''] * 2],
 }
