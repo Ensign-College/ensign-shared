@@ -39,7 +39,7 @@ def parse_date(datetime_str):
     try:
         # Attempt to parse the input string as a date
         parsed_date = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
-        return True, parsed_date.strftime("%Y-%m-%d %H:%M:%S")
+        return True, parsed_date
     except ValueError:
         pass
 
@@ -48,7 +48,7 @@ def parse_date(datetime_str):
         parsed_date = datetime.strptime(
             f'{datetime_str} 00:00:00', '%Y-%m-%d %H:%M:%S'
         )
-        return False, parsed_date.strftime("%Y-%m-%d %H:%M:%S")
+        return False, parsed_date
     # default value
     except ValueError:
         return False, yesterday
