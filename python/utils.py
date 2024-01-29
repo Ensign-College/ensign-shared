@@ -131,7 +131,7 @@ def build_aggregated_query_string(start, stop, bucket, every, fn):
 
     return query
 
-def build_parquet_file(query_string):
+def build_parquet_file(query_string, filename):
     start_process = datetime.now()
     log_message = f'Start: {start_process.strftime("%Y-%m-%d %H:%M:%S")}'
     syslog.syslog(syslog.LOG_INFO, log_message)
@@ -188,15 +188,15 @@ def build_parquet_file(query_string):
     new_table = pa.Table.from_pandas(df)
 
     # Specify the file path
-    current_year_month = yesterday.strftime('%Y%m')
-    file_name = f'{current_year_month}_servers.parquet'
+    # current_year_month = yesterday.strftime('%Y%m')
+    # filename = f'{current_year_month}_servers.parquet'
 
     # Write the Arrow Table to a Parquet file
     log_message = 'Creating/Appending parquet file!'
     syslog.syslog(syslog.LOG_INFO, log_message)
     print(log_message)
 
-    full_path = f'{FILES_DIRECTORY}/{file_name}'
+    full_path = f'{FILES_DIRECTORY}/{filename}'
     if os.path.exists(full_path):
         existing_table = pq.read_table(full_path)
         combined_table = pa.concat_tables([existing_table, new_table])
@@ -209,7 +209,7 @@ def build_parquet_file(query_string):
     client.close()
 
 
-def build_csv_file(query_string):
+def build_csv_file(query_string, filename):
     start_process = datetime.now()
     log_message = f'Start: {start_process.strftime("%Y-%m-%d %H:%M:%S")}'
     syslog.syslog(syslog.LOG_INFO, log_message)
@@ -232,8 +232,8 @@ def build_csv_file(query_string):
     print(log_message)
 
     # Specify the file path
-    current_year_month = yesterday.strftime('%Y%m')
-    file_name = f'{current_year_month}_servers.csv'
+    # current_year_month = yesterday.strftime('%Y%m')
+    # filename = f'{current_year_month}_servers.csv'
 
     # Write the Arrow Table to a Parquet file
     log_message = 'Creating/Appending csv file!'
@@ -258,7 +258,7 @@ def build_csv_file(query_string):
             )
             formated_rows.append(formated_row)
 
-    full_path = f'{FILES_DIRECTORY}/{file_name}'
+    full_path = f'{FILES_DIRECTORY}/{filename}'
     mode = 'a' if os.path.exists(full_path) else 'w'
 
     with open(full_path, mode=mode, newline='') as file:

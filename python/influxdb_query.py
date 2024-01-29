@@ -1,5 +1,6 @@
 import argparse
 import syslog
+import os
 from datetime import datetime, timedelta
 
 from constants import FILTERS, MEASUREMENTS
@@ -9,6 +10,7 @@ from utils import (build_aggregated_query_string, build_csv_file,
                    parse_end_date, parse_start_date)
 
 load_dotenv()  # take environment variables from .env.
+DEFAULT_FILENAME=os.environ.get('FILE_NAME', '2024Winter.parquet')
 
 # Create the parser
 parser = argparse.ArgumentParser()
@@ -39,6 +41,7 @@ parser.add_argument(
     '-o', '--output', type=str, required=True, default='parquet',
     choices=['parquet', 'csv']
 )
+parser.add_argument('-f', '--filename', type=str, default=DEFAULT_FILENAME)
 # Parse the argument
 args = parser.parse_args()
 
@@ -98,9 +101,9 @@ print(log_message)
 
 # call function
 if args.output == 'parquet':
-    build_parquet_file(query_string)
+    build_parquet_file(query_string, filename=args.filename)
 else:
-    build_csv_file(query_string)
+    build_csv_file(query_string, filename=args.filename)
 
 log_message = 'Process finished!'
 syslog.syslog(syslog.LOG_INFO, log_message)
